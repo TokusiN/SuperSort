@@ -1,8 +1,7 @@
 // ============================================================
 //
-//    SuperSortU.cpp
+//    SuperQuickSortU.cpp
 //
 // ============================================================
-#define SUPERSORT_UNSIGNED
-
-#include "SuperSortS.cpp"
+#define SUPERQUICKSORT_UNSIGNED
+#include "SuperQuickSort.cpp"

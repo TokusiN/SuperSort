@@ -1,8 +1,9 @@
 // ============================================================
 //
-//    SuperSortU.cpp
+//    SuperQuickSort.h
 //
 // ============================================================
-#define SUPERSORT_UNSIGNED
+#pragma once
 
-#include "SuperSortS.cpp"
+void SuperQuickSort(int* array, size_t num);
+void SuperQuickSort(unsigned int* array, size_t num);

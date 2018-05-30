@@ -1,8 +1,18 @@
-// ============================================================
-//
-//    SuperQuickSort.cpp
-//
-// ============================================================
+/*
+	Copyright 2018 Toshihiro Shirakawa
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -945,6 +955,8 @@ namespace {
 		int rightFraction = (int)(num - alignedSize - leftFraction);
 		if (alignedSize < 128 && (leftFraction == 0 || rightFraction == 0))
 		{
+			// 左右の端数を含む128ワード未満のソート
+			// 再帰の末尾で呼びたくないのでサイズだけ記録しておく。
 			if (leftFraction)
 			{
 				return (int)num << 16;
@@ -1070,14 +1082,8 @@ namespace {
 			__m256i maskflip8 = _mm256_setr_epi32(7, 6, 5, 4, 3, 2, 1, 0);
 			l = alignedArray;
 			r = alignedArray + alignedSize - 32;
-			m0 = _mm256_load_si256((__m256i*)(l + 0));
-			m1 = _mm256_load_si256((__m256i*)(l + 8));
-			m2 = _mm256_load_si256((__m256i*)(l + 16));
-			m3 = _mm256_load_si256((__m256i*)(l + 24));
-			m4 = _mm256_load_si256((__m256i*)(r + 0));
-			m5 = _mm256_load_si256((__m256i*)(r + 8));
-			m6 = _mm256_load_si256((__m256i*)(r + 16));
-			m7 = _mm256_load_si256((__m256i*)(r + 24));
+			Load32(l, m0, m1, m2, m3);
+			Load32(r, m4, m5, m6, m7);
 
 			bool fracL = leftFraction;
 			bool fracR = rightFraction;
@@ -1086,10 +1092,7 @@ namespace {
 				Merge3232();
 				if (m3.m256i_i32[7] <= pivot)
 				{
-					_mm256_store_si256((__m256i*)(l + 0), m0);
-					_mm256_store_si256((__m256i*)(l + 8), m1);
-					_mm256_store_si256((__m256i*)(l + 16), m2);
-					_mm256_store_si256((__m256i*)(l + 24), m3);
+					Store32(l, m0, m1, m2, m3);
 					if (fracL && l == alignedArray)
 					{
 						fracL = false;
@@ -1099,10 +1102,7 @@ namespace {
 							array[i] = alignedArray[i];
 							alignedArray[i] = tmp;
 						}
-						m0 = _mm256_load_si256((__m256i*)(l + 0));
-						m1 = _mm256_load_si256((__m256i*)(l + 8));
-						m2 = _mm256_load_si256((__m256i*)(l + 16));
-						m3 = _mm256_load_si256((__m256i*)(l + 24));
+						Load32(l, m0, m1, m2, m3);
 						SuperSort64Reg();
 					}
 					else
@@ -1110,24 +1110,15 @@ namespace {
 						l += 32;
 						if (l == r)
 						{
-							_mm256_store_si256((__m256i*)(r + 0), m4);
-							_mm256_store_si256((__m256i*)(r + 8), m5);
-							_mm256_store_si256((__m256i*)(r + 16), m6);
-							_mm256_store_si256((__m256i*)(r + 24), m7);
+							Store32(r, m4, m5, m6, m7);
 							break;
 						}
-						m0 = _mm256_load_si256((__m256i*)(l + 0));
-						m1 = _mm256_load_si256((__m256i*)(l + 8));
-						m2 = _mm256_load_si256((__m256i*)(l + 16));
-						m3 = _mm256_load_si256((__m256i*)(l + 24));
+						Load32(l, m0, m1, m2, m3);
 					}
 				}
 				if (m4.m256i_i32[0] >= pivot)
 				{
-					_mm256_store_si256((__m256i*)(r + 0), m4);
-					_mm256_store_si256((__m256i*)(r + 8), m5);
-					_mm256_store_si256((__m256i*)(r + 16), m6);
-					_mm256_store_si256((__m256i*)(r + 24), m7);
+					Store32(r, m4, m5, m6, m7);
 					if (fracR && r == alignedArray + alignedSize - 32)
 					{
 						fracR = false;
@@ -1137,10 +1128,7 @@ namespace {
 							alignedArray[i + alignedSize - rightFraction] = alignedArray[i + alignedSize];
 							alignedArray[i + alignedSize] = tmp;
 						}
-						m4 = _mm256_load_si256((__m256i*)(r + 0));
-						m5 = _mm256_load_si256((__m256i*)(r + 8));
-						m6 = _mm256_load_si256((__m256i*)(r + 16));
-						m7 = _mm256_load_si256((__m256i*)(r + 24));
+						Load32(r, m4, m5, m6, m7);
 						SuperSort64Reg();
 					}
 					else
@@ -1148,20 +1136,14 @@ namespace {
 						r -= 32;
 						if (l == r)
 						{
-							_mm256_store_si256((__m256i*)(l + 0), m0);
-							_mm256_store_si256((__m256i*)(l + 8), m1);
-							_mm256_store_si256((__m256i*)(l + 16), m2);
-							_mm256_store_si256((__m256i*)(l + 24), m3);
+							Store32(l, m0, m1, m2, m3);
 							break;
 						}
-						m4 = _mm256_load_si256((__m256i*)(r + 0));
-						m5 = _mm256_load_si256((__m256i*)(r + 8));
-						m6 = _mm256_load_si256((__m256i*)(r + 16));
-						m7 = _mm256_load_si256((__m256i*)(r + 24));
+						Load32(r, m4, m5, m6, m7);
 					}
 				}
 			}
-			assert(fracL || fracR);
+			assert(!(fracL || fracR));
 			int lfrac = 0, rfrac = 0;
 			if (rightFraction)
 			{

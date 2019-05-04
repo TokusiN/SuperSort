@@ -7,6 +7,9 @@ void SuperSortD(double* array, size_t num);
 
 
 namespace {
+	size_t g_bufsize = 0;
+	double* g_buf1;
+	double* g_buf2;
 	void* AlignedMalloc(size_t size)
 	{
 		void* ptr = _mm_malloc(size, 32);
@@ -37,6 +40,17 @@ void SuperSortD(double* arr, size_t num)
 	{
 		alignedsize = (num - 1 | 15) + 1;
 	}
+	if (alignedsize > g_bufsize)
+	{
+		if (g_bufsize)
+		{
+			AlignedFree(g_buf1);
+			AlignedFree(g_buf2);
+		}
+		g_bufsize = alignedsize * 2;
+		g_buf1 = (double*)AlignedMalloc(sizeof(double) * g_bufsize);
+		g_buf2 = (double*)AlignedMalloc(sizeof(double) * g_bufsize);
+	}
 	if (num == alignedsize && isAligned)
 	{
 		if (alignedsize > 64)
@@ -58,7 +72,7 @@ void SuperSortD(double* arr, size_t num)
 	}
 	else
 	{
-		double* buf = (double*)AlignedMalloc(sizeof(double) * alignedsize);
+		double* buf = g_buf1;
 		size_t i;
 		for (i = num; i < alignedsize; i++)
 		{
@@ -82,7 +96,6 @@ void SuperSortD(double* arr, size_t num)
 			SuperSortD64(buf);
 		}
 		memcpy(arr, buf, sizeof(double) * num);
-		AlignedFree(buf);
 	}
 }
 
@@ -471,8 +484,7 @@ namespace {
 
 	void SuperSortDAligned(double * array, size_t num)
 	{
-		double* buf = (double*)AlignedMalloc(sizeof(double) * num * 16);
+		double* buf = g_buf2;
 		SuperSortRecD(buf, array, array, num);
-		AlignedFree(buf);
 	}
 }// namespace

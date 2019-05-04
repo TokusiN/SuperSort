@@ -9,7 +9,7 @@ void SuperSortD(double* array, size_t num);
 namespace {
 	void* AlignedMalloc(size_t size)
 	{
-		void* ptr = _mm_malloc(size, 256);
+		void* ptr = _mm_malloc(size, 32);
 		return ptr;
 	}
 
@@ -17,7 +17,7 @@ namespace {
 	{
 		_mm_free(ptr);
 	}
-//	void SuperSortDAligned(double* array, size_t num);
+	void SuperSortDAligned(double* array, size_t num);
 	void SuperSortD32(double* arr, double* dst = NULL);
 	void SuperSortD48(double* arr, double* dst = NULL);
 	void SuperSortD64(double* arr, double* dst = NULL);
@@ -25,9 +25,9 @@ namespace {
 
 #define PADDING_MAX INFINITY
 
-void SuperSortD(double* array, size_t num)
+void SuperSortD(double* arr, size_t num)
 {
-	bool isAligned = (((size_t)array) & 31) == 0;
+	bool isAligned = (((size_t)arr) & 16) == 0;
 	size_t alignedsize;
 	if (num < 32)
 	{
@@ -35,25 +35,25 @@ void SuperSortD(double* array, size_t num)
 	}
 	else
 	{
-		alignedsize = (num - 1 | 16) + 1;
+		alignedsize = (num - 1 | 15) + 1;
 	}
 	if (num == alignedsize && isAligned)
 	{
 		if (alignedsize > 64)
 		{
-			//SuperSortDAligned(array, alignedsize / 16);
+			SuperSortDAligned(arr, alignedsize / 16);
 		}
 		else if (alignedsize == 32)
 		{
-			SuperSortD32(array);
+			SuperSortD32(arr);
 		}
 		else if (alignedsize == 48)
 		{
-			SuperSortD48(array);
+			SuperSortD48(arr);
 		}
 		else
 		{
-			SuperSortD64(array);
+			SuperSortD64(arr);
 		}
 	}
 	else
@@ -64,10 +64,10 @@ void SuperSortD(double* array, size_t num)
 		{
 			buf[i] = PADDING_MAX;
 		}
-		memcpy(buf, array, sizeof(double) * num);
-		if (alignedsize > 128)
+		memcpy(buf, arr, sizeof(double) * num);
+		if (alignedsize > 64)
 		{
-			//SuperSortDAligned(buf, alignedsize / 16);
+			SuperSortDAligned(buf, alignedsize / 16);
 		}
 		else if (alignedsize == 32)
 		{
@@ -81,7 +81,7 @@ void SuperSortD(double* array, size_t num)
 		{
 			SuperSortD64(buf);
 		}
-		memcpy(array, buf, sizeof(double) * num);
+		memcpy(arr, buf, sizeof(double) * num);
 		AlignedFree(buf);
 	}
 }
@@ -276,10 +276,10 @@ namespace {
 		m1 = _mm256_load_pd(arr + 4);
 		m2 = _mm256_load_pd(arr + 8);
 		m3 = _mm256_load_pd(arr + 12);
-		m4 = _mm256_load_pd(arr + 16 + 0);
-		m5 = _mm256_load_pd(arr + 16 + 4);
-		m6 = _mm256_load_pd(arr + 16 + 8);
-		m7 = _mm256_load_pd(arr + 16 + 12);
+		m4 = _mm256_load_pd(dst + 16 + 0);
+		m5 = _mm256_load_pd(dst + 16 + 4);
+		m6 = _mm256_load_pd(dst + 16 + 8);
+		m7 = _mm256_load_pd(dst + 16 + 12);
 		Merge1616();
 		_mm256_store_pd(dst + 0, m0);
 		_mm256_store_pd(dst + 4, m1);
@@ -344,5 +344,135 @@ namespace {
 		_mm256_store_pd(dst + 32 + 4, m5);
 		_mm256_store_pd(dst + 32 + 8, m6);
 		_mm256_store_pd(dst + 32 + 12, m7);
+	}
+
+	void MergeD(double* src1, size_t size1, double* src2, size_t size2, double* dst)
+	{
+		size_t i, j;
+		i = j = 1;
+		__m256d m0, m1, m2, m3, m4, m5, m6, m7;
+
+		m0 = _mm256_load_pd(src1 + 0);
+		m1 = _mm256_load_pd(src1 + 4);
+		m2 = _mm256_load_pd(src1 + 8);
+		m3 = _mm256_load_pd(src1 + 12);
+		m4 = _mm256_load_pd(src2 + 0);
+		m5 = _mm256_load_pd(src2 + 4);
+		m6 = _mm256_load_pd(src2 + 8);
+		m7 = _mm256_load_pd(src2 + 12);
+		Merge1616();
+		_mm256_store_pd(dst + 0, m0);
+		_mm256_store_pd(dst + 4, m1);
+		_mm256_store_pd(dst + 8, m2);
+		_mm256_store_pd(dst + 12, m3);
+		src1 += 16;
+		src2 += 16;
+		dst += 16;
+		while (1)
+		{
+			if (src1[0] > src2[0])
+			{
+				m0 = _mm256_load_pd(src2 + 0);
+				m1 = _mm256_load_pd(src2 + 4);
+				m2 = _mm256_load_pd(src2 + 8);
+				m3 = _mm256_load_pd(src2 + 12);
+				src2 += 16;
+				j++;
+				Merge1616();
+				_mm256_store_pd(dst + 0, m0);
+				_mm256_store_pd(dst + 4, m1);
+				_mm256_store_pd(dst + 8, m2);
+				_mm256_store_pd(dst + 12, m3);
+				dst += 16;
+				if (j == size2)
+				{
+					while (i < size1)
+					{
+						m0 = _mm256_load_pd(src1 + 0);
+						m1 = _mm256_load_pd(src1 + 4);
+						m2 = _mm256_load_pd(src1 + 8);
+						m3 = _mm256_load_pd(src1 + 12);
+						src1 += 16;
+						i++;
+						Merge1616();
+						_mm256_store_pd(dst + 0, m0);
+						_mm256_store_pd(dst + 4, m1);
+						_mm256_store_pd(dst + 8, m2);
+						_mm256_store_pd(dst + 12, m3);
+						dst += 16;
+					}
+					break;
+				}
+			}
+			else
+			{
+				m0 = _mm256_load_pd(src1 + 0);
+				m1 = _mm256_load_pd(src1 + 4);
+				m2 = _mm256_load_pd(src1 + 8);
+				m3 = _mm256_load_pd(src1 + 12);
+				src1 += 16;
+				i++;
+				Merge1616();
+				_mm256_store_pd(dst + 0, m0);
+				_mm256_store_pd(dst + 4, m1);
+				_mm256_store_pd(dst + 8, m2);
+				_mm256_store_pd(dst + 12, m3);
+				dst += 16;
+				if (i == size1)
+				{
+					while (j < size2)
+					{
+						m0 = _mm256_load_pd(src2 + 0);
+						m1 = _mm256_load_pd(src2 + 4);
+						m2 = _mm256_load_pd(src2 + 8);
+						m3 = _mm256_load_pd(src2 + 12);
+						src2 += 16;
+						j++;
+						Merge1616();
+						_mm256_store_pd(dst + 0, m0);
+						_mm256_store_pd(dst + 4, m1);
+						_mm256_store_pd(dst + 8, m2);
+						_mm256_store_pd(dst + 12, m3);
+						dst += 16;
+					}
+					break;
+				}
+			}
+		}
+		_mm256_store_pd(dst + 0, m4);
+		_mm256_store_pd(dst + 4, m5);
+		_mm256_store_pd(dst + 8, m6);
+		_mm256_store_pd(dst + 12, m7);
+	}
+	void SuperSortRecD(double* src, double* dst, double* org, size_t num)
+	{
+		if (num > 4)
+		{
+			SuperSortRecD(dst, src, org, num / 2);
+			SuperSortRecD(dst + num / 2 * 16, src + num / 2 * 16, org + num / 2 * 16, num - num / 2);
+			MergeD(src, num / 2, src + num / 2 * 16, num - num / 2, dst);
+		}
+		else
+		{
+			if (num == 4)
+			{
+				SuperSortD64(org, dst);
+			}
+			else if (num == 3)
+			{
+				SuperSortD48(org, dst);
+			}
+			else
+			{
+				SuperSortD32(org, dst);
+			}
+		}
+	}
+
+	void SuperSortDAligned(double * array, size_t num)
+	{
+		double* buf = (double*)AlignedMalloc(sizeof(double) * num * 16);
+		SuperSortRecD(buf, array, array, num);
+		AlignedFree(buf);
 	}
 }// namespace
